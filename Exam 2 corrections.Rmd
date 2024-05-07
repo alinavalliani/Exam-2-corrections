@@ -1,0 +1,254 @@
+---
+title: "Exam 2, Spring 2024"
+author: "Alina Valliani"
+date: "DATA 2401"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message = FALSE)
+library(tidyverse)
+```
+
+# Instructions 
+
+This exam is covered by the **UHD honor code**. Turning in this exam acknowledges that all work submitted on this exam is your own, and that you have not used any off limit resource. You may use the R help files and your notes as needed. 
+
+Be sure to commit your rmd __*and*__ your knitted results to GitHub. 
+
+You are submitting this exam under the UHD honor code. Answer all below questions on the `Exam2_template_S24.Rmd` provided on Github. Complete the questions, knit the file to html, commit and push to your repository *BEFORE 1:15*. __Any commit that is pushed after 1:15 will not be graded.__ 
+
+Code clarity and organization will be 5 points of your total grade. Make sure you have comments where needed and your code is easy to follow (and grade), do not print out whole dataframes. Please read this document carefully to make sure that you don't miss any requested task. 
+
+\newpage
+
+# 0 - Loading in Data 
+
+Use this code to read in your data. 
+
+AKCdata is data about 136 breeds of dogs, from the American Kennel Club. There are variables with missing data.
+
+```{r}
+AKCdata <- read_csv("https://raw.githubusercontent.com/kshoemaker/Exam2Data/main/best_in_show.csv", show_col_types = F, na = c("", "no data","-")) %>%
+  mutate(intelligence_category = factor(intelligence_category, levels = c("Unknown", "Lowest", "Fair", "Average", "Above average", "Excellent", "Brightest"), ordered = T, exclude = NULL), 
+         Suitability_for_Children = factor(Suitability_for_Children, levels = c("Unknown", "Low", "Medium", "High"), ordered = T, exclude = NULL))
+
+sizedata <- read_csv("https://raw.githubusercontent.com/kshoemaker/Exam2Data/main/DogSize.csv", show_col_types = F)
+
+
+```
+
+
+# 1 - Dog Info - EDA using dplyr and ggplot
+
+We will start with `AKCdata`, information about dog breeds from the American Kennel Club. 
+
+```{r}
+glimpse(AKCdata)
+```
+
+
+
+Using dplyr and the data, answer the following questions:
+
+* (1.1) What are the 10 most popular dogs? The 10 most intelligent dogs? A quick note: For both `Popularity` and `INTELLIGENCE_ranking`, 1 is the highest ranking, so the most popular dog will have Popularity of 1. 
+
+```{r}
+AKCdata %>% arrange(Popularity) %>% slice(1:10)
+```
+```{r}
+AKCdata %>% arrange(INTELLIGENCE_ranking) %>% slice(1:10)
+```
+
+
+* (1.2) What are the 5 dogs with the longest `average_lifetime`? 
+
+```{r}
+AKCdata %>% arrange(-Average_Lifetime) %>% slice (1:5)
+
+```
+* (1.3) What is the dog breed with the longest average lifetime in each `category`?
+
+```{r}
+AKCdata %>%
+  group_by(category) %>%
+  summarise(mean(Average_Lifetime))
+```
+
+* (1.4) Suppose I'm interested in dogs with "High" `Suitability_for_Children` and that live a long time. Use this data to find the ideal dogs for me. 
+
+```{r}
+numdog_suggest = 3
+
+AKCdata %>% filter(Suitability_for_Children =="High") %>% 
+  arrange(-Average_Lifetime) %>% 
+  slice(1:numdog_suggest)
+```
+
+* (1.5) How many types of dogs are in each `category`?
+
+```{r}
+AKCdata %>%
+  group_by(category) %>%
+  summarize(count = n()) %>%
+  arrange(-count)
+```
+
+
+* (1.6) What is the average purchase price and the average popularity ranking for each category of dogs? Use the variables `Average_Price` and `Popularity`. Arrange your results by average price.
+
+```{r}
+AKCdata %>%
+  group_by(category) %>%
+  summarise(mean_Average_Price = mean(Average_Price, na.rm = TRUE), mean_Popularity = mean(Popularity, na.rm = TRUE)) %>% 
+  arrange(-mean_Average_Price)
+
+```
+
+* (1.7) Create an appropriate graph that looks at the *distribution* of the `Average_Price` of all the dogs.
+
+```{r}
+AKCdata %>% ggplot(aes(x= Average_Price)) + 
+  geom_histogram(bins = 50, color= "red",  alpha = 0.5, position = 'identity') + 
+  theme_minimal()
+```
+
+* (1.8) Now, do the same idea again, but filter the data to the most expensive and least expensive two categories (on average). Color or facet the graph by categories.
+
+```{r}
+category_summary <- AKCdata %>% group_by(category) %>%
+  mutate(avg_price = mean(Average_Price,na.rm = TRUE)) %>% arrange(avg_price)
+
+most_expensive_category <- tail(unique(category_summary$category), 2)
+least_expensive_category <- head(unique(category_summary$category), 2)
+
+AKCdata %>% filter(category %in% c(most_expensive_category, least_expensive_category))%>%
+  ggplot(aes(x = Average_Price, fill = category)) +
+  geom_histogram(bins = 50, color = "red", alpha = 0.5, position = "identity") +
+  facet_wrap(~category) +
+  theme_minimal()
+```
+
+
+
+# 2 - Relationships 
+
+Go back to the unfiltered AKCdata to answer the following questions about relationships in the data. 
+
+* (2.1) Is there a relationship between the `Popularity` and the `Average_Price`? Use an appropriate plot to investigate visually. 
+
+```{R}
+AKCdata %>%
+  ggplot() +
+  aes(x = Popularity,
+      y = Average_Price) +
+  geom_point() + 
+  coord_flip()
+```
+
+* (2.2) Looks like there are some outliers in price - What are the top 10 most expensive breeds? Make it so that your result table only shows `Dog_breed`, `category`, `Popularity` and `Average_Price`
+
+```{r}
+AKCdata %>%
+  arrange(-Average_Price) %>%
+  select(Dog_breed, category, Popularity, Average_Price) %>%
+  head(10)
+```
+
+* (2.3) How many dog breeds are in each `intelligence_category`? You may answer with a summary table or with an appropriate graph. 
+
+```{r}
+AKCdata %>% 
+  group_by(intelligence_category) %>%
+  summarize(count = n())
+```
+
+* (2.4) What is the relationship between `category` and `intelligence_category`? Use an appropriate graph to look. 
+
+```{r}
+ggplot(AKCdata, aes(x = category, fill = intelligence_category)) +
+  geom_bar(position = "dodge", color = "red", stat = "count") +
+  labs(x = "Category", y = "Count", fill = "Intelligence Category") +
+  theme_minimal()
+```
+
+
+* (2.5) Is there a relationship between `category`,  `Popularity` and the `Intelligence_ranking`? Use an appropriate plot to find out.
+
+```{R}
+AKCdata_filtered <- AKCdata[!is.na(AKCdata$INTELLIGENCE_ranking), ]
+
+bubble_plot <- ggplot(AKCdata_filtered, aes(x = INTELLIGENCE_ranking, y = Popularity, color = category)) +
+  geom_point(alpha = 0.7) +
+  scale_size_continuous(range = c(3, 10)) +
+  labs(x = "Intelligence Ranking", y = "Popularity", title = "Bubble Plot of Popularity vs Intelligence Ranking by Category") +
+  theme_minimal()
+
+bubble_plot
+```
+
+
+# 3 - New Variable for Total Costs
+
+We have the average purchase price of the dog, `Average_Price`, the average lifetime of the dog, `Average_Lifetime`, and the food cost per year, `Food_cost_per_year`. If we're interested in the lifetime cost of the dog, we can find that! 
+
+(3.1) Create a new column in your dataframe called `Total_cost` that adds together the `Average_Price` of the dog breed and the `Food_cost_per_year` times the `Average_Lifetime` of that breed. Be sure to add it to your dataframe.
+
+
+```{r}
+AKCdata <- AKCdata %>% 
+  mutate(Total_cost = Average_Price + Food_cost_per_year * Average_Lifetime)
+```
+
+
+(3.2) Let's check again now that we have this total cost value -  is there a relationship between `Total_cost` and `Popularity`?
+
+```{r}
+AKCdata %>% ggplot(aes(x= Popularity, y = Total_cost, color = Popularity)) +
+  geom_point()
+```
+
+
+# 4 - Join in the size info
+
+The AKC data has a size category, but nothing about their height and weight specifically. Most of the dog breeds have their sizes listed in the second "sizedata" dataframe.
+
+(4.1) Using a join, combine the size info with the AKCdata. We are only interested in dog breeds that have AKC data *and* size data at this point, so consider the correct join to use. 
+
+```{r}
+combine_AKCdata <- left_join(AKCdata, sizedata, by = c("Dog_breed"="Breed"))
+combine_AKCdata
+```
+
+(4.2) It is said that small dogs live longer. Choose an appropriate tool (or tools) to investigate the relationship between size and average lifetime. You may use any of the variables available to you.
+
+```{r}
+ggplot(combine_AKCdata, aes(x = Average_Lifetime , y = weight_avg_lbs)) +
+  geom_point() +
+  labs(x = "Average Lifetime", y = "Weight") +
+  theme_minimal()
+
+```
+
+# 5 - Your Turn
+
+**Using one or both of these dataframes of dogs, state a question and create a plot (or plots) of your own to answer that question.** You may use the original dataframes, the filtered dataframes, the joined dataframe, or any combination of your choice. 
+
+Your question doesn’t have to have an *interesting* answer, but your plot must answer the question. However, extra credit will be given for interesting plots and questions. 
+Find the dog breed that is less expensive and popular. 
+Answer : Affenpinscher
+
+```{r}
+less_expensive_popular <- AKCdata %>% na.omit() %>%
+  arrange(Total_cost) %>%
+  slice_head(n = 5)
+
+# Create a bar plot to visualize the popularity of less expensive dog breeds
+ggplot(less_expensive_popular, aes(x = reorder(Dog_breed, Popularity), y = Popularity)) +
+  geom_bar(stat = "identity", fill = "black") +
+  labs(x = "Breed", y = "Popularity", title = "Popularity of Less Expensive Dog Breeds") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
